@@ -16,7 +16,6 @@ provider "aws" {
 # 1. NETWORK ARCHITECTURE
 # ----------------------------------------------------------------------
 
-# AWS VPC (10.0.0.0/16)
 resource "aws_vpc" "capstone_vpc" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
@@ -27,7 +26,7 @@ resource "aws_vpc" "capstone_vpc" {
   }
 }
 
-# AWS Subnet (10.0.1.0/24)
+#tfsec:ignore:aws-ec2-no-public-ip-subnet
 resource "aws_subnet" "capstone_subnet" {
   vpc_id                  = aws_vpc.capstone_vpc.id
   cidr_block              = var.subnet_cidr
@@ -38,7 +37,6 @@ resource "aws_subnet" "capstone_subnet" {
   }
 }
 
-# AWS Internet Gateway
 resource "aws_internet_gateway" "capstone_igw" {
   vpc_id = aws_vpc.capstone_vpc.id
 
@@ -47,7 +45,6 @@ resource "aws_internet_gateway" "capstone_igw" {
   }
 }
 
-# AWS Route Table mapping 0.0.0.0/0 to IGW
 resource "aws_route_table" "capstone_public_rt" {
   vpc_id = aws_vpc.capstone_vpc.id
 
@@ -61,7 +58,6 @@ resource "aws_route_table" "capstone_public_rt" {
   }
 }
 
-# Route Table Association
 resource "aws_route_table_association" "capstone_rta" {
   subnet_id      = aws_subnet.capstone_subnet.id
   route_table_id = aws_route_table.capstone_public_rt.id
@@ -71,31 +67,30 @@ resource "aws_route_table_association" "capstone_rta" {
 # 2. FIREWALL & SECURITY GROUP
 # ----------------------------------------------------------------------
 
+#tfsec:ignore:aws-ec2-add-description-to-security-group-rule
 resource "aws_security_group" "web_sg" {
   name        = "capstone-web-sg"
   description = "Allow HTTP inbound from anywhere and SSH inbound ONLY from home IP"
   vpc_id      = aws_vpc.capstone_vpc.id
 
-  # Ingress Port 80 (HTTP) from Anywhere
   ingress {
-    description = "HTTP Ingress"
+    description = "Allow HTTP access from anywhere"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Ingress Port 22 (SSH) strictly from Home IP (/32)
   ingress {
-    description = "SSH Ingress from Home IP"
+    description = "Allow SSH access strictly from home IP"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = [var.my_home_ip]
   }
 
-  # Egress (Outbound traffic allow all)
   egress {
+    description = "Allow all outbound traffic"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -108,10 +103,9 @@ resource "aws_security_group" "web_sg" {
 }
 
 # ----------------------------------------------------------------------
-# 3. SERVER INSTANCE (Amazon Linux 2023 with Apache user_data)
+# 3. SERVER INSTANCE
 # ----------------------------------------------------------------------
 
-# Data source for latest Amazon Linux 2023 AMI
 data "aws_ami" "amazon_linux_2023" {
   most_recent = true
   owners      = ["amazon"]
@@ -122,12 +116,15 @@ data "aws_ami" "amazon_linux_2023" {
   }
 }
 
-# EC2 Web Server Instance
 resource "aws_instance" "web_server" {
   ami                    = data.aws_ami.amazon_linux_2023.id
   instance_type          = "t2.micro"
   subnet_id              = aws_subnet.capstone_subnet.id
   vpc_security_group_ids = [aws_security_group.web_sg.id]
+
+  metadata_options {
+    http_tokens = "required"
+  }
 
   user_data = <<-EOF
               #!/bin/bash
