@@ -69,5 +69,7 @@ curl http://<INSTANCE_PUBLIC_IP>
 # Tear down provisioned cloud resources
 terraform destroy -auto-approve
 
+---
+
 #Maintainer
 Isabelli Duran — Cloud & DevSecOps Engineer
