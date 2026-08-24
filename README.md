@@ -70,7 +70,6 @@ curl http://<INSTANCE_PUBLIC_IP>
 terraform destroy -auto-approve
 
 ---
-
 ```
 #Maintainer
 Isabelli Duran — Cloud & DevSecOps Engineer
